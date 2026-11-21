@@ -1,0 +1,59 @@
+# .github/workflows/ct.yml — CI/CD/CT du modèle de classification des vins
+name: CI-CD-CT modele vins
+
+on:
+  push:
+    branches: [main]
+    paths: ["src/**", "api/**", "params.yaml", "dvc.yaml"] # CI : le code ou les paramètres changent
+  schedule:
+    - cron: "0 3 * * 1" # CT planifié : chaque lundi à 3 h (UTC)
+  workflow_dispatch: # CT manuel (bouton Run workflow)
+  repository_dispatch:
+    types: [derive-detectee] # CT déclenché par le monitoring (partie 4)
+
+jobs:
+  entrainer-evaluer:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - name: Pipeline de données et entraînement (préparer, valider, entraîner)
+        run: dvc repro # s'arrête si la validation échoue
+      - name: Porte de qualité
+        run: python src/evaluer.py # échoue si le modèle n'est pas assez bon
+      - name: Tests de l'API avec le nouveau modèle
+        run: pytest tests/ -v
+      - uses: actions/upload-artifact@v4
+        with:
+          name: modele
+          path: |
+            modeles/modele_final.pkl
+            metriques.json
+
+  livrer:
+    needs: entrainer-evaluer # seulement si la porte est franchie
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: modele
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: api/Dockerfile
+          push: true
+          tags: ghcr.io/${{ github.repository_owner }}/api-modele-ml:${{ github.sha }}
+      # Déploiement canary : voir la partie DevOps (Kubernetes, kubectl set image)

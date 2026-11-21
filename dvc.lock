@@ -1,0 +1,58 @@
+schema: '2.0'
+stages:
+  preparer:
+    cmd: python src/preparer.py
+    deps:
+    - path: src/preparer.py
+      hash: md5
+      md5: 3d2fb08838dc8cdbe574e127fd72315b
+      size: 453
+    outs:
+    - path: data/vins.csv
+      hash: md5
+      md5: d170aaaaf3e11b40f4bc573f83142b9f
+      size: 12440
+  valider:
+    cmd: python src/valider.py data/vins.csv
+    deps:
+    - path: data/vins.csv
+      hash: md5
+      md5: d170aaaaf3e11b40f4bc573f83142b9f
+      size: 12440
+    - path: src/valider.py
+      hash: md5
+      md5: 43ca458fecf9535f2ab59926e1da3cff
+      size: 1315
+  entrainer:
+    cmd: python src/entrainer.py
+    deps:
+    - path: data/vins.csv
+      hash: md5
+      md5: d170aaaaf3e11b40f4bc573f83142b9f
+      size: 12440
+    - path: src/entrainer.py
+      hash: md5
+      md5: eb3983fdee67818a2a4609a0dd74e5db
+      size: 2253
+    params:
+      params.yaml:
+        entrainement:
+          n_estimators:
+          - 50
+          - 100
+          - 200
+          max_depth:
+          - 3
+          - 6
+          - 10
+          test_size: 0.2
+          seed: 42
+    outs:
+    - path: metriques.json
+      hash: md5
+      md5: 31cf1eebdf13f25bc822699b79448bf9
+      size: 78
+    - path: modeles/modele_final.pkl
+      hash: md5
+      md5: 81e337e23c527bf5e47491e3b0a78b2d
+      size: 73409
